@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OSI 7-Layer Interactive Model</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    .draggable-card {
+      user-select: none;
+      touch-action: none;
+      cursor: grab;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .draggable-card:active { cursor: grabbing; transform: scale(0.97); }
+    .draggable-card.selected { outline: 3px solid #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.6); }
+    .drop-slot { min-height: 48px; transition: all 0.2s; }
+    .drop-slot.drag-over { background-color: rgba(56, 189, 248, 0.2) !important; border-color: #38bdf8 !important; }
+    .slot-correct { border-color: #22c55e !important; background-color: rgba(34, 197, 94, 0.15) !important; }
+    .slot-wrong { border-color: #ef4444 !important; background-color: rgba(239, 68, 68, 0.15) !important; animation: shake 0.3s; }
+    .slot-dimmed { opacity: 0.35; filter: grayscale(80%); }
+    .tab-active { background-color: #0284c7 !important; color: #ffffff !important; border-color: #38bdf8 !important; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-3 md:p-6 font-sans">
+  <div class="max-w-7xl mx-auto">
+    
+    <!-- Header -->
+    <header class="flex flex-col md:flex-row justify-between items-center mb-4 pb-4 border-b border-slate-800 gap-4">
+      <div>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-wide text-sky-400">THE OSI MODEL: INTERACTIVE LAB</h1>
+        <p class="text-xs md:text-sm text-slate-400">Match Layer Names, PDUs (Encapsulation), Protocols, and Hardware Devices.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap justify-end">
+        <button id="audioToggleBtn" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg transition shadow">Sound: ON 🔊</button>
+        <button id="solveBtn" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs rounded-lg shadow transition">Show Answers</button>
+        <button id="checkBtn" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-lg shadow transition">Check Answers</button>
+        <button id="resetBtn" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-lg border border-slate-700 transition">Reset</button>
+      </div>
+    </header>
+
+    <!-- Scope / Category Tabs -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-2 mb-4 scrollbar-thin">
+      <span class="text-xs font-bold uppercase tracking-wider text-slate-400 pr-1">Filter Practice:</span>
+      <button class="mode-tab tab-active px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 transition" data-mode="all">All Categories</button>
+      <button class="mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 transition" data-mode="name">1. Layer Names</button>
+      <button class="mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 transition" data-mode="pdu">2. Encapsulation / PDU</button>
+      <button class="mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 transition" data-mode="protocols">3. Protocols / Standards</button>
+      <button class="mode-tab px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-300 transition" data-mode="hardware">4. Network Equipment & Hardware</button>
+    </div>
+
+    <!-- Score Status Banner -->
+    <div id="resultBanner" class="hidden mb-4 p-4 rounded-xl border flex items-center justify-between transition-all">
+      <div class="flex items-center gap-3">
+        <span id="resultIcon" class="text-2xl">🎯</span>
+        <div>
+          <h3 id="resultTitle" class="font-bold text-base">Results</h3>
+          <p id="resultSubtitle" class="text-xs text-slate-300"></p>
+        </div>
+      </div>
+      <div class="font-mono text-xl font-black" id="scoreDisplay">0 / 28</div>
+    </div>
+
+    <!-- Main Board -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div class="lg:col-span-8 flex flex-col gap-2.5" id="layersBoard"></div>
+
+      <!-- Card Bank -->
+      <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col h-[750px]">
+        <div class="flex justify-between items-center mb-3">
+          <div>
+            <h2 id="bankTitle" class="text-xs font-bold tracking-wider text-slate-300 uppercase">Card Bank (All)</h2>
+          </div>
+          <span id="bankCount" class="text-xs bg-slate-800 px-2.5 py-1 rounded-full text-sky-400 font-mono">0 items</span>
+        </div>
+        <div id="cardBank" class="flex-1 overflow-y-auto space-y-2 pr-1"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Audio Synthesizer
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playTone(freq, type, duration, startTime = 0, gainLevel = 0.15) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+        gain.gain.setValueAtTime(gainLevel, ctx.currentTime + startTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + startTime);
+        osc.stop(ctx.currentTime + startTime + duration);
+      } catch (e) {}
+    }
+
+    function playSnap() { playTone(540, 'sine', 0.08, 0, 0.2); }
+    function playSuccessChord() {
+      playTone(523.25, 'triangle', 0.25, 0.00, 0.15);
+      playTone(659.25, 'triangle', 0.25, 0.10, 0.15);
+      playTone(783.99, 'triangle', 0.35, 0.20, 0.15);
+    }
+    function playFailureBuzz() {
+      playTone(180, 'sawtooth', 0.2, 0.00, 0.15);
+      playTone(130, 'sawtooth', 0.3, 0.12, 0.15);
+    }
+    function playVictoryFanfare() {
+      const notes = [
+        { f: 523.25, d: 0.12, t: 0.00 },
+        { f: 659.25, d: 0.12, t: 0.12 },
+        { f: 783.99, d: 0.12, t: 0.24 },
+        { f: 1046.50, d: 0.40, t: 0.36 },
+        { f: 783.99, d: 0.15, t: 0.65 },
+        { f: 1046.50, d: 0.70, t: 0.80 }
+      ];
+      notes.forEach(n => playTone(n.f, 'triangle', n.d, n.t, 0.2));
+    }
+
+    const audioBtn = document.getElementById("audioToggleBtn");
+    audioBtn.addEventListener("click", () => {
+      getAudioContext();
+      soundEnabled = !soundEnabled;
+      if (soundEnabled) {
+        audioBtn.innerText = "Sound: ON 🔊";
+        audioBtn.className = "px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg transition shadow";
+        playSnap();
+      } else {
+        audioBtn.innerText = "Sound: OFF 🔇";
+        audioBtn.className = "px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 font-semibold text-xs rounded-lg transition shadow";
+      }
+    });
+
+    window.addEventListener("pointerdown", () => getAudioContext(), { once: false });
+
+    function triggerVictoryConfetti() {
+      if (typeof confetti !== "function") return;
+      confetti({ particleCount: 160, spread: 80, origin: { y: 0.6 } });
+    }
+
+    // Reference Data
+    const LAYERS_DATA = [
+      { id: 7, name: "Application", color: "#f97316", bg: "rgba(249, 115, 22, 0.08)", border: "#ea580c", pdu: "Data", protocols: "HTTP, HTTPS, FTP, SMTP, DNS, SSH, DHCP", hardware: "Web Browsers, Email Clients, Filezilla" },
+      { id: 6, name: "Presentation", color: "#eab308", bg: "rgba(234, 179, 8, 0.08)", border: "#ca8a04", pdu: "Data", protocols: "SSL/TLS, ASCII, JPEG, MPEG, GIF, WAV", hardware: "Data Formatting, Encryption, Compression" },
+      { id: 5, name: "Session", color: "#84cc16", bg: "rgba(132, 204, 22, 0.08)", border: "#65a30d", pdu: "Data", protocols: "NetBIOS, RPC, PPTP, SOCKS", hardware: "Remote Procedure Calls, Auth Sessions" },
+      { id: 4, name: "Transport", color: "#10b981", bg: "rgba(16, 185, 129, 0.08)", border: "#059669", pdu: "Segments", protocols: "TCP (Reliable), UDP (Fast)", hardware: "No common hardware (Focus on services)" },
+      { id: 3, name: "Network", color: "#06b6d4", bg: "rgba(6, 182, 212, 0.08)", border: "#0891b2", pdu: "Packets", protocols: "IPv4, IPv6, ICMP (Ping), IPsec", hardware: "Routers" },
+      { id: 2, name: "Data Link", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.08)", border: "#2563eb", pdu: "Frames", protocols: "Ethernet (802.3), Wi-Fi (802.11), MAC, PPP", hardware: "Network Switches, Bridges" },
+      { id: 1, name: "Physical", color: "#8b5cf6", bg: "rgba(139, 92, 246, 0.08)", border: "#7c3aed", pdu: "Bits", protocols: "Ethernet Cables (UTP), Fiber Optic, Wi-Fi RF", hardware: "NICs, Hubs, Repeaters, Cables" }
+    ];
+
+    let items = [];
+    LAYERS_DATA.forEach(layer => {
+      items.push({ id: `name-${layer.id}`, text: layer.name, type: "name", layerId: layer.id });
+      items.push({ id: `pdu-${layer.id}`, text: layer.pdu, type: "pdu", layerId: layer.id });
+      items.push({ id: `proto-${layer.id}`, text: layer.protocols, type: "protocols", layerId: layer.id });
+      items.push({ id: `hw-${layer.id}`, text: layer.hardware, type: "hardware", layerId: layer.id });
+    });
+
+    let currentMode = "all";
+    let selectedItem = null;
+
+    function init() {
+      const board = document.getElementById("layersBoard");
+      board.innerHTML = "";
+      LAYERS_DATA.forEach(layer => {
+        const row = document.createElement("div");
+        row.className = "rounded-xl border p-2.5 flex flex-col gap-2";
+        row.style.borderColor = layer.border;
+        row.style.backgroundColor = layer.bg;
+        row.innerHTML = `
+          <div class="flex items-center gap-2 font-bold text-xs" style="color: ${layer.color}">
+            <span class="w-5 h-5 rounded-full flex items-center justify-center text-[11px] text-white" style="background: ${layer.border}">
+              ${layer.id}
+            </span>
+            <span>Layer ${layer.id}</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
+            <div class="drop-slot rounded-lg border border-dashed border-slate-700 bg-slate-900/70 p-2 text-xs flex flex-col justify-center" data-slot="name" data-layer="${layer.id}">
+              <span class="text-slate-500 font-mono pointer-events-none mb-1 text-[10px] uppercase">Layer Name</span>
+            </div>
+            <div class="drop-slot rounded-lg border border-dashed border-slate-700 bg-slate-900/70 p-2 text-xs flex flex-col justify-center" data-slot="pdu" data-layer="${layer.id}">
+              <span class="text-slate-500 font-mono pointer-events-none mb-1 text-[10px] uppercase">Data Unit (PDU)</span>
+            </div>
+            <div class="drop-slot rounded-lg border border-dashed border-slate-700 bg-slate-900/70 p-2 text-xs flex flex-col justify-center" data-slot="protocols" data-layer="${layer.id}">
+              <span class="text-slate-500 font-mono pointer-events-none mb-1 text-[10px] uppercase">Protocols</span>
+            </div>
+            <div class="drop-slot rounded-lg border border-dashed border-slate-700 bg-slate-900/70 p-2 text-xs flex flex-col justify-center" data-slot="hardware" data-layer="${layer.id}">
+              <span class="text-slate-500 font-mono pointer-events-none mb-1 text-[10px] uppercase">Hardware / Devices</span>
+            </div>
+          </div>
+        `;
+        board.appendChild(row);
+      });
+
+      setupTabs();
+      renderBank();
+      setupInteractions();
+    }
+
+    function setupTabs() {
+      const tabs = document.querySelectorAll(".mode-tab");
+      tabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+          tabs.forEach(t => t.classList.remove("tab-active"));
+          tab.classList.add("tab-active");
+          currentMode = tab.getAttribute("data-mode");
+          
+          const titles = {
+            all: "Card Bank (All)",
+            name: "Card Bank (Layer Names)",
+            pdu: "Card Bank (Encapsulation / PDU)",
+            protocols: "Card Bank (Protocols)",
+            hardware: "Card Bank (Hardware & Devices)"
+          };
+          document.getElementById("bankTitle").innerText = titles[currentMode];
+
+          // Highlight / dim relevant columns
+          document.querySelectorAll(".drop-slot").forEach(slot => {
+            const slotType = slot.getAttribute("data-slot");
+            if (currentMode === "all" || currentMode === slotType) {
+              slot.classList.remove("slot-dimmed");
+            } else {
+              slot.classList.add("slot-dimmed");
+            }
+          });
+
+          renderBank();
+        });
+      });
+    }
+
+    function renderBank() {
+      const bank = document.getElementById("cardBank");
+      bank.innerHTML = "";
+      
+      const filtered = items.filter(item => {
+        // Don't show cards already placed on board
+        const isPlaced = document.querySelector(`.drop-slot [data-id="${item.id}"]`);
+        if (isPlaced) return false;
+        if (currentMode === "all") return true;
+        return item.type === currentMode;
+      });
+
+      const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+      shuffled.forEach(item => {
+        const card = createCard(item);
+        bank.appendChild(card);
+      });
+      updateBankCount();
+    }
+
+    function createCard(item) {
+      const card = document.createElement("div");
+      card.className = "draggable-card bg-slate-800 border border-slate-700 hover:border-slate-500 p-2.5 rounded-lg text-xs font-medium text-slate-200 shadow-sm";
+      card.setAttribute("draggable", "true");
+      card.setAttribute("data-id", item.id);
+      card.setAttribute("data-type", item.type);
+      card.setAttribute("data-layer", item.layerId);
+      card.innerText = item.text;
+
+      card.addEventListener("dragstart", (e) => {
+        getAudioContext();
+        e.dataTransfer.setData("text/plain", item.id);
+        card.classList.add("opacity-50");
+      });
+      card.addEventListener("dragend", () => card.classList.remove("opacity-50"));
+
+      card.addEventListener("click", () => {
+        getAudioContext();
+        if (selectedItem === card) {
+          card.classList.remove("selected");
+          selectedItem = null;
+        } else {
+          if (selectedItem) selectedItem.classList.remove("selected");
+          selectedItem = card;
+          card.classList.add("selected");
+        }
+      });
+
+      return card;
+    }
+
+    function setupInteractions() {
+      const slots = document.querySelectorAll(".drop-slot");
+      slots.forEach(slot => {
+        slot.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          slot.classList.add("drag-over");
+        });
+        slot.addEventListener("dragleave", () => slot.classList.remove("drag-over"));
+        slot.addEventListener("drop", (e) => {
+          e.preventDefault();
+          slot.classList.remove("drag-over");
+          const itemId = e.dataTransfer.getData("text/plain");
+          const card = document.querySelector(`[data-id="${itemId}"]`);
+          if (card) {
+            placeCard(card, slot);
+            playSnap();
+          }
+        });
+
+        slot.addEventListener("click", () => {
+          getAudioContext();
+          if (selectedItem) {
+            placeCard(selectedItem, slot);
+            playSnap();
+            selectedItem.classList.remove("selected");
+            selectedItem = null;
+          }
+        });
+      });
+
+      const bank = document.getElementById("cardBank");
+      bank.addEventListener("dragover", (e) => e.preventDefault());
+      bank.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const itemId = e.dataTransfer.getData("text/plain");
+        const card = document.querySelector(`[data-id="${itemId}"]`);
+        if (card) {
+          bank.appendChild(card);
+          playSnap();
+          updateBankCount();
+        }
+      });
+      bank.addEventListener("click", () => {
+        getAudioContext();
+        if (selectedItem && selectedItem.parentElement !== bank) {
+          bank.appendChild(selectedItem);
+          playSnap();
+          selectedItem.classList.remove("selected");
+          selectedItem = null;
+          updateBankCount();
+        }
+      });
+    }
+
+    function placeCard(card, slot) {
+      const existing = slot.querySelector(".draggable-card");
+      if (existing) document.getElementById("cardBank").appendChild(existing);
+      slot.appendChild(card);
+      updateBankCount();
+    }
+
+    function updateBankCount() {
+      const count = document.getElementById("cardBank").querySelectorAll(".draggable-card").length;
+      document.getElementById("bankCount").innerText = `${count} remaining`;
+    }
+
+    function evaluateScore() {
+      const slots = document.querySelectorAll(".drop-slot");
+      let correct = 0;
+      let totalAssessed = (currentMode === "all") ? 28 : 7;
+
+      slots.forEach(slot => {
+        const slotType = slot.getAttribute("data-slot");
+        if (currentMode !== "all" && slotType !== currentMode) return;
+
+        const card = slot.querySelector(".draggable-card");
+        slot.classList.remove("slot-correct", "slot-wrong");
+        if (!card) return;
+
+        const slotLayer = slot.getAttribute("data-layer");
+        const cardType = card.getAttribute("data-type");
+        const cardLayer = card.getAttribute("data-layer");
+
+        if (slotType === cardType && slotLayer === cardLayer) {
+          slot.classList.add("slot-correct");
+          correct++;
+        } else {
+          slot.classList.add("slot-wrong");
+        }
+      });
+
+      const banner = document.getElementById("resultBanner");
+      const title = document.getElementById("resultTitle");
+      const sub = document.getElementById("resultSubtitle");
+      const score = document.getElementById("scoreDisplay");
+      const icon = document.getElementById("resultIcon");
+
+      banner.classList.remove("hidden", "bg-emerald-950/60", "border-emerald-500", "bg-amber-950/60", "border-amber-500", "bg-rose-950/60", "border-rose-500");
+      score.innerText = `${correct} / ${totalAssessed}`;
+
+      if (correct === totalAssessed) {
+        banner.classList.add("bg-emerald-950/60", "border-emerald-500");
+        icon.innerText = "🏆";
+        title.innerText = (currentMode === "all") ? "100% OSI Mastery!" : "Category Completed!";
+        title.className = "font-bold text-emerald-400";
+        sub.innerText = "All items in this section are correctly positioned.";
+        playVictoryFanfare();
+        triggerVictoryConfetti();
+      } else if (correct >= Math.floor(totalAssessed * 0.7)) {
+        banner.classList.add("bg-amber-950/60", "border-amber-500");
+        icon.innerText = "👍";
+        title.innerText = "Great Progress!";
+        title.className = "font-bold text-amber-400";
+        sub.innerText = "Check the red-outlined items and try again.";
+        playSuccessChord();
+      } else {
+        banner.classList.add("bg-rose-950/60", "border-rose-500");
+        icon.innerText = "🔄";
+        title.innerText = "Keep Practicing!";
+        title.className = "font-bold text-rose-400";
+        sub.innerText = `${totalAssessed - correct} items need adjustment or placement.`;
+        playFailureBuzz();
+      }
+    }
+
+    document.getElementById("checkBtn").addEventListener("click", () => {
+      getAudioContext();
+      evaluateScore();
+    });
+
+    document.getElementById("solveBtn").addEventListener("click", () => {
+      getAudioContext();
+      const slots = document.querySelectorAll(".drop-slot");
+      slots.forEach(slot => {
+        const slotType = slot.getAttribute("data-slot");
+        if (currentMode !== "all" && slotType !== currentMode) return;
+        const slotLayer = slot.getAttribute("data-layer");
+        const matchingCard = document.querySelector(`.draggable-card[data-type="${slotType}"][data-layer="${slotLayer}"]`);
+        if (matchingCard) slot.appendChild(matchingCard);
+      });
+      updateBankCount();
+      evaluateScore();
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      document.querySelectorAll(".drop-slot").forEach(slot => {
+        slot.classList.remove("slot-correct", "slot-wrong");
+        const card = slot.querySelector(".draggable-card");
+        if (card) {
+          const slotType = slot.getAttribute("data-slot");
+          if (currentMode === "all" || slotType === currentMode) {
+            document.getElementById("cardBank").appendChild(card);
+          }
+        }
+      });
+      document.getElementById("resultBanner").classList.add("hidden");
+      renderBank();
+    });
+
+    window.onload = init;
+  </script>
+</body>
+</html>
