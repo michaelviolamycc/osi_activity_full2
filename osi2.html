@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OSI Model Drag and Drop Activity</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background-color: #23272a;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      color: #ff6a00;
+      font-size: 2rem;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    p.subtitle {
+      color: #b9bbbe;
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .container {
+      display: flex;
+      flex-direction: row;
+      gap: 32px;
+      max-width: 1100px;
+      width: 100%;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    /* Left side: OSI layers with drop slots */
+    .layers-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1.3;
+    }
+
+    .layer-row {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .layer-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: #ffffff;
+      padding: 14px 10px;
+      border-radius: 12px;
+      min-height: 64px;
+      user-select: none;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Graphic-matching badge colors */
+    .badge-application  { background-color: #0298a6; }
+    .badge-presentation { background-color: #00a859; }
+    .badge-session      { background-color: #00a651; }
+    .badge-transport    { background-color: #5bb328; }
+    .badge-network      { background-color: #a4c619; }
+    .badge-datalink     { background-color: #d89f07; }
+    .badge-physical     { background-color: #f15a24; }
+
+    .dropzone {
+      background-color: #2f3136;
+      border: 2px dashed #4f545c;
+      border-radius: 12px;
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .dropzone.drag-over {
+      border-color: #00d26a;
+      background-color: #36393f;
+      transform: scale(1.01);
+    }
+
+    /* Right side: Bank of draggable cards */
+    .bank-panel {
+      flex: 1;
+      background-color: #2f3136;
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+    }
+
+    .bank-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #40444b;
+      color: #ffffff;
+    }
+
+    .cards-pool {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 480px;
+    }
+
+    .card {
+      background-color: #cfdbd5;
+      color: #1a1a1a;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: grab;
+      font-size: 0.88rem;
+      line-height: 1.4;
+      user-select: none;
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.25);
+      border-left: 6px solid #4f545c;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .card:active {
+      cursor: grabbing;
+    }
+
+    .card.dragging {
+      opacity: 0.35;
+    }
+
+    .card ul {
+      list-style-type: disc;
+      padding-left: 18px;
+    }
+
+    .card li {
+      margin: 2px 0;
+    }
+
+    /* Controls and Results */
+    .controls {
+      margin-top: 28px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    button {
+      background-color: #ff6a00;
+      color: #ffffff;
+      border: none;
+      padding: 12px 24px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    button:hover {
+      background-color: #e05d00;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button.btn-reset {
+      background-color: #4f545c;
+    }
+
+    button.btn-reset:hover {
+      background-color: #5d6269;
+    }
+
+    #feedback {
+      margin-top: 16px;
+      font-size: 1.15rem;
+      font-weight: 600;
+      min-height: 28px;
+    }
+
+    .correct {
+      border: 2px solid #00d26a !important;
+      background-color: #eafaf1 !important;
+    }
+
+    .incorrect {
+      border: 2px solid #f04747 !important;
+      background-color: #fde8e8 !important;
+    }
+
+    @media (max-width: 820px) {
+      .container {
+        flex-direction: column;
+      }
+      .layer-row {
+        grid-template-columns: 1fr;
+      }
+      .bank-panel {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>7 Layers of the OSI Model</h1>
+  <p class="subtitle">Drag each description block into its corresponding OSI layer slot.</p>
+
+  <div class="container">
+    <!-- Left Target Rows -->
+    <div class="layers-container" id="targetContainer">
+      <div class="layer-row">
+        <div class="layer-badge badge-application">Application</div>
+        <div class="dropzone" data-target="application"></div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-badge badge-presentation">Presentation</div>
+        <div class="dropzone" data-target="presentation"></div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-badge badge-session">Session</div>
+        <div class="dropzone" data-target="session"></div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-badge badge-transport">Transport</div>
+        <div class="dropzone" data-target="transport"></div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-badge badge-network">Network</div>
+        <div class="dropzone" data-target="network"></div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-badge badge-datalink">Data Link</div>
+        <div class="dropzone" data-target="datalink"></div>
+      </div>
+      <div class="layer-row">
+        <div class="layer-badge badge-physical">Physical</div>
+        <div class="dropzone" data-target="physical"></div>
+      </div>
+    </div>
+
+    <!-- Right Draggable Cards Pool -->
+    <div class="bank-panel">
+      <div class="bank-title">Descriptions & Protocols</div>
+      <div class="cards-pool dropzone-bank" id="cardsBank"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="checkBtn">Check Answers</button>
+    <button class="btn-reset" id="resetBtn">Reset</button>
+  </div>
+  <div id="feedback"></div>
+
+  <script>
+    const itemsData = [
+      {
+        id: "application",
+        line1: "End User layer",
+        line2: "HTTP, FTP, IRC, SSH, DNS"
+      },
+      {
+        id: "presentation",
+        line1: "Syntax layer",
+        line2: "SSL, SSH, IMAP, FTP, MPEG, JPEG"
+      },
+      {
+        id: "session",
+        line1: "Synch & send to port",
+        line2: "API's, Sockets, WinSock"
+      },
+      {
+        id: "transport",
+        line1: "End-to-end connections",
+        line2: "TCP, UDP"
+      },
+      {
+        id: "network",
+        line1: "Packets",
+        line2: "IP, ICMP, IPSec, IGMP"
+      },
+      {
+        id: "datalink",
+        line1: "Frames",
+        line2: "Ethernet, PPP, Switch, Bridge"
+      },
+      {
+        id: "physical",
+        line1: "Physical structure",
+        line2: "Coax, Fiber, Wireless, Hubs, Repeaters"
+      }
+    ];
+
+    const bank = document.getElementById('cardsBank');
+    const feedback = document.getElementById('feedback');
+    const dropzones = document.querySelectorAll('.dropzone');
+    let draggedCard = null;
+
+    function buildCards() {
+      bank.innerHTML = '';
+      dropzones.forEach(zone => {
+        zone.innerHTML = '';
+        zone.classList.remove('correct', 'incorrect');
+      });
+      feedback.textContent = '';
+
+      // Shuffle cards randomly
+      const shuffled = [...itemsData].sort(() => Math.random() - 0.5);
+
+      shuffled.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.draggable = true;
+        card.dataset.layer = item.id;
+        card.id = 'card-' + item.id;
+        card.innerHTML = `
+          <ul>
+            <li>${item.line1}</li>
+            <li>${item.line2}</li>
+          </ul>
+        `;
+
+        card.addEventListener('dragstart', handleDragStart);
+        card.addEventListener('dragend', handleDragEnd);
+        bank.appendChild(card);
+      });
+    }
+
+    function handleDragStart(e) {
+      draggedCard = this;
+      this.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', this.id);
+    }
+
+    function handleDragEnd() {
+      this.classList.remove('dragging');
+      draggedCard = null;
+    }
+
+    // Drop targets registration
+    const allDropAreas = [...dropzones, bank];
+
+    allDropAreas.forEach(area => {
+      area.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        area.classList.add('drag-over');
+      });
+
+      area.addEventListener('dragleave', () => {
+        area.classList.remove('drag-over');
+      });
+
+      area.addEventListener('drop', (e) => {
+        e.preventDefault();
+        area.classList.remove('drag-over');
+
+        if (!draggedCard) return;
+
+        // If target is a layer slot and already contains a card, swap it back to bank
+        if (area.classList.contains('dropzone') && area.children.length > 0) {
+          bank.appendChild(area.children[0]);
+        }
+
+        area.appendChild(draggedCard);
+        clearCardFeedback();
+      });
+    });
+
+    function clearCardFeedback() {
+      dropzones.forEach(zone => {
+        if (zone.firstElementChild) {
+          zone.firstElementChild.classList.remove('correct', 'incorrect');
+        }
+      });
+      feedback.textContent = '';
+    }
+
+    document.getElementById('checkBtn').addEventListener('click', () => {
+      let correctCount = 0;
+      let placedCount = 0;
+
+      dropzones.forEach(zone => {
+        const expected = zone.dataset.target;
+        const card = zone.firstElementChild;
+
+        if (card) {
+          placedCount++;
+          card.classList.remove('correct', 'incorrect');
+          if (card.dataset.layer === expected) {
+            card.classList.add('correct');
+            correctCount++;
+          } else {
+            card.classList.add('incorrect');
+          }
+        }
+      });
+
+      if (placedCount === 0) {
+        feedback.style.color = '#ffa500';
+        feedback.textContent = 'Drag some cards into the slots before checking!';
+      } else if (correctCount === itemsData.length) {
+        feedback.style.color = '#00d26a';
+        feedback.textContent = '🎉 Perfect! All 7 layers matched correctly!';
+      } else {
+        feedback.style.color = '#ff6b6b';
+        feedback.textContent = `You scored ${correctCount} out of ${itemsData.length}. Check the red cards and try again!`;
+      }
+    });
+
+    document.getElementById('resetBtn').addEventListener('click', buildCards);
+
+    // Initial load
+    buildCards();
+  </script>
+</body>
+</html>
