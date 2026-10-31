@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>7 Layers of the OSI Model</title>
+  <style>
+    :root {
+      --bg: #222222;
+      --panel-bg: #1c1c1c;
+      --text: #ffffff;
+      --accent: #f76707;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      min-height: 100vh;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    h1 {
+      color: var(--accent);
+      font-size: 2.6rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #bbb;
+      font-size: 1.05rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .main-layout {
+      display: flex;
+      flex-direction: row;
+      gap: 32px;
+      max-width: 1150px;
+      width: 100%;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    /* OSI Chassis Diagram */
+    .osi-chassis {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1.6;
+    }
+
+    .row {
+      display: flex;
+      align-items: stretch;
+      gap: 12px;
+      height: 72px;
+    }
+
+    .dropzone {
+      width: 250px;
+      min-width: 250px;
+      border: 2.5px dashed #555;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.03);
+      transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    }
+
+    .dropzone.drag-over {
+      border-color: #ffd43b;
+      background: rgba(255, 212, 59, 0.18);
+      transform: scale(1.02);
+    }
+
+    .dropzone-label {
+      color: #777;
+      font-size: 0.95rem;
+      font-weight: 600;
+      pointer-events: none;
+    }
+
+    .desc-pill {
+      flex: 1;
+      border-radius: 16px;
+      color: #111;
+      padding: 10px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+
+    .desc-pill ul {
+      margin-left: 20px;
+    }
+
+    .desc-pill li {
+      font-size: 0.95rem;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    /* Draggable Chips Bank */
+    .bank-panel {
+      flex: 1;
+      background: var(--panel-bg);
+      border: 1px solid #333;
+      border-radius: 18px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+
+    .bank-header {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #ff922b;
+      text-align: center;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+    }
+
+    .bank-slots {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 480px;
+    }
+
+    /* Draggable Item styling */
+    .chip {
+      height: 68px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #ffffff;
+      cursor: grab;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      user-select: none;
+      -webkit-user-select: none;
+      width: 100%;
+      transition: opacity 0.15s, transform 0.15s, outline 0.1s;
+    }
+
+    .chip:active {
+      cursor: grabbing;
+    }
+
+    .chip.is-dragging {
+      opacity: 0.4;
+      transform: scale(0.97);
+    }
+
+    .chip.selected {
+      outline: 4px solid #ffffff;
+      filter: brightness(1.15);
+    }
+
+    /* Diagram Colors */
+    .c-7 { background-color: #008f88; }
+    .c-6 { background-color: #00a86b; }
+    .c-5 { background-color: #00af43; }
+    .c-4 { background-color: #55c400; }
+    .c-3 { background-color: #9ecc00; }
+    .c-2 { background-color: #c99e00; }
+    .c-1 { background-color: #ff5500; }
+
+    .d-7 { background-color: #cde4e0; }
+    .d-6 { background-color: #cce7dd; }
+    .d-5 { background-color: #cee7d4; }
+    .d-4 { background-color: #dbeece; }
+    .d-3 { background-color: #ecedd0; }
+    .d-2 { background-color: #ede2ce; }
+    .d-1 { background-color: #f1cfcb; }
+
+    .actions {
+      margin-top: 24px;
+    }
+
+    button {
+      background: #333;
+      color: #fff;
+      border: 1px solid #666;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #444;
+    }
+
+    #win-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    }
+
+    .win-card {
+      background: #252525;
+      border: 2px solid #51cf66;
+      border-radius: 20px;
+      padding: 40px;
+      text-align: center;
+      max-width: 440px;
+    }
+
+    .win-card h2 {
+      color: #51cf66;
+      font-size: 2.2rem;
+      margin-bottom: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .main-layout {
+        flex-direction: column-reverse;
+      }
+      .dropzone {
+        width: 170px;
+        min-width: 170px;
+      }
+      .chip {
+        font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>7 Layers of the OSI Model</h1>
+  <p class="subtitle">Drag each layer to its spot, or click a layer and click the matching slot</p>
+
+  <div class="main-layout">
+    <!-- OSI Chassis Target Slots -->
+    <div class="osi-chassis" id="chassis"></div>
+
+    <!-- Draggable Bank with Shuffled Chips -->
+    <div class="bank-panel">
+      <div class="bank-header">Unassigned Layers</div>
+      <div class="bank-slots" id="bank"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button onclick="setupGame()">Reset & Reshuffle</button>
+  </div>
+
+  <div id="win-overlay">
+    <div class="win-card">
+      <h2>Great Work!</h2>
+      <p style="color:#ddd; margin-bottom: 20px; font-size: 1.1rem;">You successfully assembled all 7 layers of the OSI stack in order.</p>
+      <button style="background:#51cf66; color:#000;" onclick="setupGame()">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+    const layerData = [
+      { id: 7, name: "Application", bullet1: "End User layer", bullet2: "HTTP, FTP, IRC, SSH, DNS" },
+      { id: 6, name: "Presentation", bullet1: "Syntax layer", bullet2: "SSL, SSH, IMAP, FTP, MPEG, JPEG" },
+      { id: 5, name: "Session", bullet1: "Synch & send to port", bullet2: "API's, Sockets, WinSock" },
+      { id: 4, name: "Transport", bullet1: "End-to-end connections", bullet2: "TCP, UDP" },
+      { id: 3, name: "Network", bullet1: "Packets", bullet2: "IP, ICMP, IPSec, IGMP" },
+      { id: 2, name: "Data Link", bullet1: "Frames", bullet2: "Ethernet, PPP, Switch, Bridge" },
+      { id: 1, name: "Physical", bullet1: "Physical structure", bullet2: "Coax, Fiber, Wireless, Hubs, Repeaters" }
+    ];
+
+    let selectedChip = null;
+
+    function setupGame() {
+      document.getElementById("win-overlay").style.display = "none";
+      const chassis = document.getElementById("chassis");
+      const bank = document.getElementById("bank");
+
+      chassis.innerHTML = "";
+      bank.innerHTML = "";
+      selectedChip = null;
+
+      // 1. Render empty OSI Chassis Slots (Layer 7 down to Layer 1)
+      layerData.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "row";
+
+        const dropzone = document.createElement("div");
+        dropzone.className = "dropzone";
+        dropzone.dataset.targetId = item.id;
+        dropzone.innerHTML = `<span class="dropzone-label">Drop Layer Here</span>`;
+
+        // Standard HTML5 Drag-and-Drop listeners
+        dropzone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          dropzone.classList.add("drag-over");
+        });
+
+        dropzone.addEventListener("dragleave", () => {
+          dropzone.classList.remove("drag-over");
+        });
+
+        dropzone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          dropzone.classList.remove("drag-over");
+          const draggedId = e.dataTransfer.getData("text/plain");
+          const chip = document.getElementById(`chip-${draggedId}`);
+          if (chip) {
+            tryPlaceChip(chip, dropzone);
+          }
+        });
+
+        // Click-to-place fallback
+        dropzone.addEventListener("click", () => {
+          if (selectedChip) {
+            tryPlaceChip(selectedChip, dropzone);
+            clearSelection();
+          }
+        });
+
+        const desc = document.createElement("div");
+        desc.className = `desc-pill d-${item.id}`;
+        desc.innerHTML = `
+          <ul>
+            <li>${item.bullet1}</li>
+            <li>${item.bullet2}</li>
+          </ul>
+        `;
+
+        row.appendChild(dropzone);
+        row.appendChild(desc);
+        chassis.appendChild(row);
+      });
+
+      // 2. Shuffle and render draggable layer cards in the bank
+      const shuffled = [...layerData].sort(() => Math.random() - 0.5);
+
+      shuffled.forEach(item => {
+        const chip = document.createElement("div");
+        chip.className = `chip c-${item.id}`;
+        chip.textContent = item.name;
+        chip.dataset.layerId = item.id;
+        chip.id = `chip-${item.id}`;
+        chip.setAttribute("draggable", "true");
+
+        // Drag Start
+        chip.addEventListener("dragstart", (e) => {
+          e.dataTransfer.setData("text/plain", item.id);
+          e.dataTransfer.effectAllowed = "move";
+          chip.classList.add("is-dragging");
+        });
+
+        // Drag End
+        chip.addEventListener("dragend", () => {
+          chip.classList.remove("is-dragging");
+        });
+
+        // Tap/Click to Select
+        chip.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (chip.dataset.locked === "true") return;
+
+          if (selectedChip === chip) {
+            clearSelection();
+          } else {
+            clearSelection();
+            selectedChip = chip;
+            chip.classList.add("selected");
+          }
+        });
+
+        bank.appendChild(chip);
+      });
+    }
+
+    function clearSelection() {
+      if (selectedChip) {
+        selectedChip.classList.remove("selected");
+        selectedChip = null;
+      }
+    }
+
+    function tryPlaceChip(chip, dropzone) {
+      if (dropzone.querySelector(".chip")) return; // Slot already full
+
+      if (dropzone.dataset.targetId === chip.dataset.layerId) {
+        // Correct match
+        const label = dropzone.querySelector(".dropzone-label");
+        if (label) label.remove();
+
+        chip.removeAttribute("draggable");
+        chip.dataset.locked = "true";
+        chip.style.cursor = "default";
+        chip.classList.remove("selected", "is-dragging");
+
+        dropzone.appendChild(chip);
+        dropzone.style.border = "none";
+        checkCompletion();
+      } else {
+        // Wrong match feedback
+        dropzone.style.borderColor = "#fa5252";
+        dropzone.style.background = "rgba(250, 82, 82, 0.25)";
+        setTimeout(() => {
+          dropzone.style.borderColor = "#555";
+          dropzone.style.background = "rgba(255, 255, 255, 0.03)";
+        }, 450);
+      }
+    }
+
+    function checkCompletion() {
+      const dropzones = document.querySelectorAll(".dropzone");
+      const complete = Array.from(dropzones).every(z => z.querySelector(".chip"));
+      if (complete) {
+        setTimeout(() => {
+          document.getElementById("win-overlay").style.display = "flex";
+        }, 300);
+      }
+    }
+
+    // Initialize
+    window.addEventListener("DOMContentLoaded", setupGame);
+  </script>
+</body>
+</html>

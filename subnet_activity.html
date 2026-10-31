@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Subnet Lab: 192.168.1.0/24 Interactive Topology</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    .draggable-item {
+      user-select: none;
+      touch-action: none;
+      cursor: grab;
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .draggable-item:active { cursor: grabbing; transform: scale(0.96); }
+    .draggable-item.selected { outline: 3px solid #0284c7; box-shadow: 0 0 12px rgba(2, 132, 199, 0.45); }
+    .slot-hover { background-color: #e0f2fe !important; border-color: #0284c7 !important; }
+    .slot-correct { border-color: #16a34a !important; background-color: #f0fdf4 !important; }
+    .slot-wrong { border-color: #dc2626 !important; background-color: #fef2f2 !important; animation: shake 0.3s; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen p-3 md:p-6 font-sans">
+  <div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 md:p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-1 bg-sky-100 text-sky-800 rounded font-mono text-xs font-bold uppercase tracking-wider">Subnet Activity</span>
+          <span class="text-xs text-slate-500 font-medium">Subnet Mask: 255.255.255.0 (/24)</span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mt-1">
+          IPv4 Subnet: <span class="text-sky-600 font-mono">192.168.1.0/24</span>
+        </h1>
+        <p class="text-xs md:text-sm text-slate-600 mt-0.5">
+          Drag and drop hardware equipment to their network nodes, then match the correct IPv4 host addresses.
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap justify-end">
+        <button id="audioToggleBtn" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg transition shadow-sm">Sound: ON 🔊</button>
+        <button id="solveBtn" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs rounded-lg shadow-sm transition">Show Answers</button>
+        <button id="checkBtn" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-lg shadow transition">Check Answers</button>
+        <button id="resetBtn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs rounded-lg transition border border-slate-300">Reset</button>
+      </div>
+    </header>
+
+    <!-- Score Status Banner -->
+    <div id="resultBanner" class="hidden mb-6 p-4 rounded-xl border flex items-center justify-between transition-all">
+      <div class="flex items-center gap-3">
+        <span id="resultIcon" class="text-2xl">🎯</span>
+        <div>
+          <h3 id="resultTitle" class="font-bold text-base">Results</h3>
+          <p id="resultSubtitle" class="text-xs text-slate-600"></p>
+        </div>
+      </div>
+      <div class="font-mono text-xl font-black" id="scoreDisplay">0 / 14</div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Topology Blueprint (Light Canvas) -->
+      <div class="lg:col-span-8 bg-white border border-slate-300 rounded-2xl shadow-sm p-4 md:p-6 flex flex-col justify-between gap-6">
+        
+        <!-- TOP: Router Gateway Node -->
+        <div class="flex justify-center">
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-3 w-72 shadow-xs" data-node="router">
+            <span class="text-[11px] font-bold tracking-wider text-slate-600 uppercase mb-1">Default Gateway (Router)</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="router">
+              <span class="text-xs text-slate-400 font-medium">Drop Router Here</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-9 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="router">
+              <span class="text-[11px] text-slate-400 font-mono">Drop Gateway IP</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connection indicators -->
+        <div class="flex justify-around items-center px-8 text-xs text-slate-400 font-mono border-y border-dashed border-slate-200 py-2">
+          <span>▲ LAN Trunk Connection</span>
+          <span class="bg-slate-700 text-white px-2 py-0.5 rounded text-[10px]">Switch 1 (Central Hub)</span>
+          <span class="bg-slate-700 text-white px-2 py-0.5 rounded text-[10px]">Switch 2 (Workgroup)</span>
+          <span>LAN Trunk Connection ▲</span>
+        </div>
+
+        <!-- MIDDLE ROW: Workstations & Laptops -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <!-- Desktop 1 -->
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-2.5 shadow-xs" data-node="desktop1">
+            <span class="text-[11px] font-bold text-slate-600 mb-1">Desktop 1</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="desktop1">
+              <span class="text-[11px] text-slate-400">Desktop 1</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-8 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="desktop1">
+              <span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>
+            </div>
+          </div>
+
+          <!-- Laptop 1 -->
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-2.5 shadow-xs" data-node="laptop1">
+            <span class="text-[11px] font-bold text-slate-600 mb-1">Laptop 1</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="laptop1">
+              <span class="text-[11px] text-slate-400">Laptop 1</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-8 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="laptop1">
+              <span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>
+            </div>
+          </div>
+
+          <!-- Laptop 2 -->
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-2.5 shadow-xs" data-node="laptop2">
+            <span class="text-[11px] font-bold text-slate-600 mb-1">Laptop 2</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="laptop2">
+              <span class="text-[11px] text-slate-400">Laptop 2</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-8 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="laptop2">
+              <span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>
+            </div>
+          </div>
+
+          <!-- Desktop 2 -->
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-2.5 shadow-xs" data-node="desktop2">
+            <span class="text-[11px] font-bold text-slate-600 mb-1">Desktop 2</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="desktop2">
+              <span class="text-[11px] text-slate-400">Desktop 2</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-8 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="desktop2">
+              <span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM ROW: Desktop 3 & Network Printer -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Desktop 3 -->
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-2.5 shadow-xs" data-node="desktop3">
+            <span class="text-[11px] font-bold text-slate-600 mb-1">Desktop 3</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="desktop3">
+              <span class="text-[11px] text-slate-400">Desktop 3</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-8 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="desktop3">
+              <span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>
+            </div>
+          </div>
+
+          <!-- Network Printer -->
+          <div class="flex flex-col items-center bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-2.5 shadow-xs" data-node="printer">
+            <span class="text-[11px] font-bold text-slate-600 mb-1">Network Printer</span>
+            <div class="drop-slot-device w-full h-16 border-2 border-dashed border-slate-300 bg-white rounded-lg flex items-center justify-center p-1" data-slot-type="device" data-target="printer">
+              <span class="text-[11px] text-slate-400">Network Printer</span>
+            </div>
+            <div class="drop-slot-ip w-full mt-2 h-8 border border-dashed border-slate-300 bg-white rounded-md flex items-center justify-center" data-slot-type="ip" data-target="printer">
+              <span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Item Inventory / Bank (Right Column) -->
+      <div class="lg:col-span-4 flex flex-col gap-4">
+        
+        <!-- Hardware Bank -->
+        <div class="bg-white border border-slate-300 rounded-2xl p-4 shadow-sm flex flex-col">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-xs font-black uppercase tracking-wider text-slate-700">Hardware Equipment</h2>
+            <span id="deviceCount" class="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">7 items</span>
+          </div>
+          <div id="deviceBank" class="grid grid-cols-2 gap-2 min-h-[120px] p-2 bg-slate-50 rounded-xl border border-slate-200"></div>
+        </div>
+
+        <!-- IPv4 Address Bank -->
+        <div class="bg-white border border-slate-300 rounded-2xl p-4 shadow-sm flex flex-col">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-xs font-black uppercase tracking-wider text-slate-700">IPv4 Addresses (192.168.1.0/24)</h2>
+            <span id="ipCount" class="text-xs font-mono bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full border border-sky-200">7 items</span>
+          </div>
+          <div id="ipBank" class="flex flex-col gap-2 min-h-[220px] p-2 bg-slate-50 rounded-xl border border-slate-200"></div>
+        </div>
+
+        <!-- Subnet Reference Card -->
+        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600">
+          <h3 class="font-bold text-slate-800 uppercase tracking-wide text-[11px] mb-2">Subnet Details</h3>
+          <ul class="space-y-1 font-mono text-[11px]">
+            <li><strong>Network ID:</strong> 192.168.1.0</li>
+            <li><strong>Subnet Mask:</strong> 255.255.255.0 (/24)</li>
+            <li><strong>Gateway Router:</strong> 192.168.1.1</li>
+            <li><strong>Broadcast IP:</strong> 192.168.1.255</li>
+          </ul>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- Audio Synthesizer (Native Web Audio API) ---
+    let audioCtx = null;
+    let soundEnabled = true;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function playTone(freq, type, duration, startTime = 0, gainLevel = 0.15) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+        gain.gain.setValueAtTime(gainLevel, ctx.currentTime + startTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + startTime + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + startTime);
+        osc.stop(ctx.currentTime + startTime + duration);
+      } catch (e) {}
+    }
+
+    function playSnap() { playTone(540, 'sine', 0.08, 0, 0.2); }
+    function playSuccessChord() {
+      playTone(523.25, 'triangle', 0.25, 0.00, 0.15); // C5
+      playTone(659.25, 'triangle', 0.25, 0.10, 0.15); // E5
+      playTone(783.99, 'triangle', 0.35, 0.20, 0.15); // G5
+    }
+    function playFailureBuzz() {
+      playTone(180, 'sawtooth', 0.2, 0.00, 0.15);
+      playTone(130, 'sawtooth', 0.3, 0.12, 0.15);
+    }
+    function playVictoryFanfare() {
+      const notes = [
+        { f: 523.25, d: 0.12, t: 0.00 },
+        { f: 659.25, d: 0.12, t: 0.12 },
+        { f: 783.99, d: 0.12, t: 0.24 },
+        { f: 1046.50, d: 0.40, t: 0.36 },
+        { f: 783.99, d: 0.15, t: 0.65 },
+        { f: 1046.50, d: 0.70, t: 0.80 }
+      ];
+      notes.forEach(n => playTone(n.f, 'triangle', n.d, n.t, 0.2));
+    }
+
+    const audioBtn = document.getElementById("audioToggleBtn");
+    audioBtn.addEventListener("click", () => {
+      getAudioContext();
+      soundEnabled = !soundEnabled;
+      if (soundEnabled) {
+        audioBtn.innerText = "Sound: ON 🔊";
+        audioBtn.className = "px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-lg transition shadow-sm";
+        playSnap();
+      } else {
+        audioBtn.innerText = "Sound: OFF 🔇";
+        audioBtn.className = "px-3.5 py-2 bg-slate-600 hover:bg-slate-500 text-white font-semibold text-xs rounded-lg transition shadow-sm";
+      }
+    });
+
+    window.addEventListener("pointerdown", () => getAudioContext(), { once: false });
+
+    function triggerVictoryConfetti() {
+      if (typeof confetti !== "function") return;
+      confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+    }
+
+    // --- Data Definitions for 192.168.1.0/24 ---
+    const HARDWARE_ITEMS = [
+      { id: "dev-router", target: "router", name: "Router", icon: "🌐" },
+      { id: "dev-desktop1", target: "desktop1", name: "Desktop 1", icon: "🖥️" },
+      { id: "dev-desktop2", target: "desktop2", name: "Desktop 2", icon: "🖥️" },
+      { id: "dev-desktop3", target: "desktop3", name: "Desktop 3", icon: "🖥️" },
+      { id: "dev-laptop1", target: "laptop1", name: "Laptop 1", icon: "💻" },
+      { id: "dev-laptop2", target: "laptop2", name: "Laptop 2", icon: "💻" },
+      { id: "dev-printer", target: "printer", name: "Printer", icon: "🖨️" }
+    ];
+
+    const IP_ITEMS = [
+      { id: "ip-router", target: "router", ip: "192.168.1.1", label: "Gateway" },
+      { id: "ip-desktop1", target: "desktop1", ip: "192.168.1.2/24", label: "Desktop 1" },
+      { id: "ip-laptop1", target: "laptop1", ip: "192.168.1.3/24", label: "Laptop 1" },
+      { id: "ip-desktop2", target: "desktop2", ip: "192.168.1.10/24", label: "Desktop 2" },
+      { id: "ip-laptop2", target: "laptop2", ip: "192.168.1.20/24", label: "Laptop 2" },
+      { id: "ip-desktop3", target: "desktop3", ip: "192.168.1.50/24", label: "Desktop 3" },
+      { id: "ip-printer", target: "printer", ip: "192.168.1.100/24", label: "Printer" }
+    ];
+
+    let selectedElement = null;
+
+    function init() {
+      renderDeviceBank();
+      renderIpBank();
+      setupDropSlots();
+    }
+
+    function renderDeviceBank() {
+      const bank = document.getElementById("deviceBank");
+      bank.innerHTML = "";
+      const shuffled = [...HARDWARE_ITEMS].sort(() => Math.random() - 0.5);
+      shuffled.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "draggable-item bg-white border border-slate-300 hover:border-sky-500 rounded-lg p-2 flex items-center gap-2 shadow-xs text-xs font-semibold";
+        el.setAttribute("draggable", "true");
+        el.setAttribute("data-id", item.id);
+        el.setAttribute("data-type", "device");
+        el.setAttribute("data-target", item.target);
+        el.innerHTML = `<span class="text-base">${item.icon}</span> <span>${item.name}</span>`;
+
+        bindCardEvents(el);
+        bank.appendChild(el);
+      });
+      updateCounts();
+    }
+
+    function renderIpBank() {
+      const bank = document.getElementById("ipBank");
+      bank.innerHTML = "";
+      const shuffled = [...IP_ITEMS].sort(() => Math.random() - 0.5);
+      shuffled.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "draggable-item bg-white border border-slate-300 hover:border-sky-500 rounded-lg px-3 py-1.5 flex items-center justify-between shadow-xs font-mono text-xs";
+        el.setAttribute("draggable", "true");
+        el.setAttribute("data-id", item.id);
+        el.setAttribute("data-type", "ip");
+        el.setAttribute("data-target", item.target);
+        el.innerHTML = `<span class="font-bold text-sky-700">${item.ip}</span> <span class="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">${item.label}</span>`;
+
+        bindCardEvents(el);
+        bank.appendChild(el);
+      });
+      updateCounts();
+    }
+
+    function bindCardEvents(el) {
+      el.addEventListener("dragstart", (e) => {
+        getAudioContext();
+        e.dataTransfer.setData("text/plain", el.getAttribute("data-id"));
+        el.classList.add("opacity-50");
+      });
+      el.addEventListener("dragend", () => el.classList.remove("opacity-50"));
+
+      el.addEventListener("click", () => {
+        getAudioContext();
+        if (selectedElement === el) {
+          el.classList.remove("selected");
+          selectedElement = null;
+        } else {
+          if (selectedElement) selectedElement.classList.remove("selected");
+          selectedElement = el;
+          el.classList.add("selected");
+        }
+      });
+    }
+
+    function setupDropSlots() {
+      const slots = document.querySelectorAll(".drop-slot-device, .drop-slot-ip");
+      slots.forEach(slot => {
+        slot.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          slot.classList.add("slot-hover");
+        });
+        slot.addEventListener("dragleave", () => slot.classList.remove("slot-hover"));
+        slot.addEventListener("drop", (e) => {
+          e.preventDefault();
+          slot.classList.remove("slot-hover");
+          const id = e.dataTransfer.getData("text/plain");
+          const card = document.querySelector(`[data-id="${id}"]`);
+          if (card) placeItem(card, slot);
+        });
+
+        slot.addEventListener("click", () => {
+          getAudioContext();
+          if (selectedElement) {
+            placeItem(selectedElement, slot);
+            selectedElement.classList.remove("selected");
+            selectedElement = null;
+          }
+        });
+      });
+
+      const devBank = document.getElementById("deviceBank");
+      const ipBank = document.getElementById("ipBank");
+
+      [devBank, ipBank].forEach(bank => {
+        bank.addEventListener("dragover", (e) => e.preventDefault());
+        bank.addEventListener("drop", (e) => {
+          e.preventDefault();
+          const id = e.dataTransfer.getData("text/plain");
+          const card = document.querySelector(`[data-id="${id}"]`);
+          if (card) {
+            bank.appendChild(card);
+            playSnap();
+            updateCounts();
+          }
+        });
+        bank.addEventListener("click", () => {
+          if (selectedElement) {
+            const cardType = selectedElement.getAttribute("data-type");
+            if ((cardType === 'device' && bank === devBank) || (cardType === 'ip' && bank === ipBank)) {
+              bank.appendChild(selectedElement);
+              playSnap();
+              selectedElement.classList.remove("selected");
+              selectedElement = null;
+              updateCounts();
+            }
+          }
+        });
+      });
+    }
+
+    function placeItem(card, slot) {
+      const cardType = card.getAttribute("data-type");
+      const slotType = slot.getAttribute("data-slot-type");
+      if (cardType !== slotType) return;
+
+      const existing = slot.querySelector(".draggable-item");
+      if (existing) {
+        const returnBank = (cardType === "device") ? document.getElementById("deviceBank") : document.getElementById("ipBank");
+        returnBank.appendChild(existing);
+      }
+
+      slot.innerHTML = "";
+      slot.appendChild(card);
+      playSnap();
+      updateCounts();
+    }
+
+    function updateCounts() {
+      const devRemain = document.getElementById("deviceBank").querySelectorAll(".draggable-item").length;
+      const ipRemain = document.getElementById("ipBank").querySelectorAll(".draggable-item").length;
+      document.getElementById("deviceCount").innerText = `${devRemain} items`;
+      document.getElementById("ipCount").innerText = `${ipRemain} items`;
+    }
+
+    function evaluateTopology() {
+      const slots = document.querySelectorAll(".drop-slot-device, .drop-slot-ip");
+      let correct = 0;
+
+      slots.forEach(slot => {
+        const card = slot.querySelector(".draggable-item");
+        slot.classList.remove("slot-correct", "slot-wrong");
+        if (!card) return;
+
+        const target = slot.getAttribute("data-target");
+        const cardTarget = card.getAttribute("data-target");
+
+        if (target === cardTarget) {
+          slot.classList.add("slot-correct");
+          correct++;
+        } else {
+          slot.classList.add("slot-wrong");
+        }
+      });
+
+      const banner = document.getElementById("resultBanner");
+      const title = document.getElementById("resultTitle");
+      const sub = document.getElementById("resultSubtitle");
+      const score = document.getElementById("scoreDisplay");
+      const icon = document.getElementById("resultIcon");
+
+      banner.classList.remove("hidden", "bg-emerald-50", "border-emerald-300", "bg-amber-50", "border-amber-300", "bg-rose-50", "border-rose-300");
+      score.innerText = `${correct} / 14`;
+
+      if (correct === 14) {
+        banner.classList.add("bg-emerald-50", "border-emerald-300");
+        icon.innerText = "🏆";
+        title.innerText = "Subnet 192.168.1.0/24 Solved!";
+        title.className = "font-bold text-emerald-800";
+        sub.innerText = "All network equipment and IPv4 addresses are assigned correctly.";
+        playVictoryFanfare();
+        triggerVictoryConfetti();
+      } else if (correct >= 9) {
+        banner.classList.add("bg-amber-50", "border-amber-300");
+        icon.innerText = "⚡";
+        title.innerText = "Almost Configured!";
+        title.className = "font-bold text-amber-800";
+        sub.innerText = "Review the red-highlighted devices or addresses and try again.";
+        playSuccessChord();
+      } else {
+        banner.classList.add("bg-rose-50", "border-rose-300");
+        icon.innerText = "⚠️";
+        title.innerText = "Subnet Misconfiguration";
+        title.className = "font-bold text-rose-800";
+        sub.innerText = `${14 - correct} slots are either empty or misconfigured.`;
+        playFailureBuzz();
+      }
+    }
+
+    document.getElementById("checkBtn").addEventListener("click", () => {
+      getAudioContext();
+      evaluateTopology();
+    });
+
+    document.getElementById("solveBtn").addEventListener("click", () => {
+      getAudioContext();
+      const slots = document.querySelectorAll(".drop-slot-device, .drop-slot-ip");
+      slots.forEach(slot => {
+        const slotType = slot.getAttribute("data-slot-type");
+        const target = slot.getAttribute("data-target");
+        const matchingCard = document.querySelector(`.draggable-item[data-type="${slotType}"][data-target="${target}"]`);
+        if (matchingCard) {
+          slot.innerHTML = "";
+          slot.appendChild(matchingCard);
+        }
+      });
+      updateCounts();
+      evaluateTopology();
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      const slots = document.querySelectorAll(".drop-slot-device, .drop-slot-ip");
+      slots.forEach(slot => {
+        slot.classList.remove("slot-correct", "slot-wrong");
+        slot.innerHTML = (slot.getAttribute("data-slot-type") === "device") 
+          ? `<span class="text-[11px] text-slate-400">Empty Slot</span>`
+          : `<span class="text-[10px] text-slate-400 font-mono">IPv4 Address</span>`;
+      });
+      document.getElementById("resultBanner").classList.add("hidden");
+      renderDeviceBank();
+      renderIpBank();
+    });
+
+    // Start immediately on window load
+    window.onload = init;
+  </script>
+</body>
+</html>
